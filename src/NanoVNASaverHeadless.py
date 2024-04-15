@@ -11,6 +11,13 @@ import numpy as np
 
 class NanoVNASaverHeadless:
     def __init__(self, vna_index=0, verbose=False, save_path="./Save.s2p"):
+        """Initialize a NanoVNASaverHeadless object.
+
+        Args:
+            vna_index (int): Number of NanoVNAs to connect, at the moment multiple VNAs are not supported. Defaults to 0.
+            verbose (bool): Print information. Defaults to False.
+            save_path (str): The path to save data to. Defaults to "./Save.s2p".
+        """
         self.verbose = verbose
         self.save_path = save_path
         self.iface = hw.get_interfaces()[vna_index]
@@ -25,6 +32,12 @@ class NanoVNASaverHeadless:
             print("Features: ", self.vna.read_features())
 
     def calibrate(self, savefile=None, load_file=False):
+        """Run the calibration guide and calibrate the NanoVNA.
+
+        Args:
+            savefile (path): Path to save the calibration. Defaults to None.
+            load_file (bool, optional): Path to existing calibration. Defaults to False.
+        """
         if load_file:
             self.CalibrationGuide.loadCalibration(load_file)
             return
@@ -36,6 +49,14 @@ class NanoVNASaverHeadless:
         self.CalibrationGuide.saveCalibration(savefile)
 
     def set_sweep(self, start, stop, segments, points):
+        """Set the sweep parameters.
+
+        Args:
+            start (int): The start frequnecy.
+            stop (int): The stop frequency.
+            segments (int): Number of segments.
+            points (int): Number of points.
+        """
         self.worker.sweep.update(start, stop, segments, points)
         if self.verbose:
             print(
@@ -53,6 +74,11 @@ class NanoVNASaverHeadless:
         return self._get_data()
 
     def stream_data(self):
+        """Creates a data stream from the continuous sweeping.
+
+        Yields:
+            list: Yields a list of data when new data is available.
+        """
         self._stream_data()
         try:
             yield list(
@@ -67,23 +93,35 @@ class NanoVNASaverHeadless:
             self._stop_worker()
 
     def _stream_data(self):
+        """Starts a thread for the sweep workers run function."""
         self.worker.sweep.set_mode("CONTINOUS")
         # Start the worker in a new thread
         self.worker_thread = threading.Thread(target=self.worker.run)
         self.worker_thread.start()
 
     def _access_data(self):
+        """Fetches the data from the sweep worker as long as it is running a sweep.
+
+        Yields:
+            list: List of data from the latest sweep.
+        """
         # Access data while the worker is running
         while self.worker.running:
             yield self._get_data()
 
     def _stop_worker(self):
+        """Stop the sweep worker and kill the stream."""
         if self.verbose:
             print("NanoVNASaverHeadless is stopping sweepworker now.")
         self.worker.running = False
         self.worker_thread.join()
 
     def _get_data(self):
+        """Get data from the sweep worker.
+
+        Returns:
+            list: Real Reflection, Imaginary Reflection, Real Through, Imaginary Through, Frequency
+        """
         data_s11 = self.worker.data11
         data_s21 = self.worker.data21
         reflRe = []
@@ -161,6 +199,11 @@ class NanoVNASaverHeadless:
         return magList
 
     def kill(self):
+        """Disconnect the NanoVNA.
+
+        Raises:
+            Exception: If the NanoVNA was not successfully disconnected.
+        """
         self.vna.disconnect()
         if self.vna.connected():
             raise Exception("The VNA was not successfully disconnected.")
