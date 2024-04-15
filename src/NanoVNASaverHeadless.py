@@ -151,7 +151,7 @@ class NanoVNASaverHeadless:
                 plt.ion() 
                 fig, ax = plt.subplots(2, 1)
                 fig.tight_layout(pad=4.0)
-                line1, = ax[0].plot(x, s11, 'b-')
+                line1 = ax[0].plot(x, s11, 'b-')
                 line2 = ax[1].plot(x, s21, 'b-')
                 plt.show()
 
