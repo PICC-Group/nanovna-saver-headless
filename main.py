@@ -16,7 +16,6 @@ data = vna.stream_data()
 for line in data:
     print(line)
 
-#vna.plot(True)
+vna.plot(True)
 
-sleep(10)
 vna.kill()
