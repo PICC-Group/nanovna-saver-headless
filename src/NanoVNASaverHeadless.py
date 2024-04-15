@@ -81,9 +81,8 @@ class NanoVNASaverHeadless:
         """
         self._stream_data()
         try:
-            yield list(
-                self._access_data()
-            )  # Monitor and process data in the main thread
+            for data in self._access_data():
+                yield data  # Yield each piece of data as it comes
         except Exception as e:
             if self.verbose:
                 print("Exception in data stream: ", e)
@@ -124,21 +123,20 @@ class NanoVNASaverHeadless:
         """
         data_s11 = self.worker.data11
         data_s21 = self.worker.data21
-        reflRe = []
-        reflIm = []
-        thruRe = []
-        thruIm = []
+        refl_re = []
+        refl_im = []
+        thru_re = []
+        thru_im = []
         freq = []
         for datapoint in data_s11:
-            reflRe.append(datapoint.re)
-            reflIm.append(datapoint.im)
+            refl_re.append(datapoint.re)
+            refl_im.append(datapoint.im)
             freq.append(datapoint.freq)
         for datapoint in data_s21:
-            thruRe.append(datapoint.re)
-            thruIm.append(datapoint.im)
+            thru_re.append(datapoint.re)
+            thru_im.append(datapoint.im)
+        return refl_re, refl_im, thru_re, thru_im, freq
 
-        return reflRe, reflIm, thruRe, thruIm, freq
-    
     def plot(self, animate):
         if animate:
             old_data = None
@@ -192,11 +190,11 @@ class NanoVNASaverHeadless:
             plt.show()
 
     
-    def magnitude(self, reList, imList):
-        magList = []
-        for re, im in zip(reList, imList):
-            magList.append(10*np.log10(np.sqrt(re**2 + im**2)))
-        return magList
+    def magnitude(self, re_list, im_list):
+        mag_list = []
+        for re, im in zip(re_list, im_list):
+            mag_list.append(10*np.log10(np.sqrt(re**2 + im**2)))
+        return mag_list
 
     def kill(self):
         """Disconnect the NanoVNA.
@@ -204,6 +202,7 @@ class NanoVNASaverHeadless:
         Raises:
             Exception: If the NanoVNA was not successfully disconnected.
         """
+        self._stop_worker()
         self.vna.disconnect()
         if self.vna.connected():
             raise Exception("The VNA was not successfully disconnected.")
