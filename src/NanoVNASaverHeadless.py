@@ -143,26 +143,26 @@ class NanoVNASaverHeadless:
             data = self.stream_data()
             for new_data in data:
                 print(new_data)
-                print('------------------')
+                print("------------------")
                 x = new_data[3]
                 s11 = self.magnitude(new_data[0], new_data[1])
                 s21 = self.magnitude(new_data[2], new_data[3])
 
-                plt.ion() 
+                plt.ion()
                 fig, ax = plt.subplots(2, 1)
                 fig.tight_layout(pad=4.0)
-                line1 = ax[0].plot(x, s11, 'b-')
-                line2 = ax[1].plot(x, s21, 'b-')
+                line1 = ax[0].plot(x, s11, "b-")
+                line2 = ax[1].plot(x, s21, "b-")
                 plt.show()
 
-                while(self.worker.running):
+                while self.worker.running:
                     if new_data != old_data:
                         s11 = self.magnitude(new_data[0], new_data[1])
                         s21 = self.magnitude(new_data[2], new_data[3])
                         line1.set_ydata(s11)
                         line2.set_ydata(s21)
-                        fig.canvas.draw() 
-                        fig.canvas.flush_events() 
+                        fig.canvas.draw()
+                        fig.canvas.flush_events()
                         old_data = new_data
 
         else:
@@ -176,24 +176,23 @@ class NanoVNASaverHeadless:
             fig, ax = plt.subplots(2, 1)
             fig.tight_layout(pad=4.0)
 
-            #plot 1
-            ax[0].plot(x, y1, label = "S11")
+            # plot 1
+            ax[0].plot(x, y1, label="S11")
             ax[0].legend()
 
-            #plot 2
-            ax[1].plot(x, y2, label = "S21")
+            # plot 2
+            ax[1].plot(x, y2, label="S21")
             ax[1].legend()
-            
+
             for ax in ax.flat:
-                ax.set(xlabel= 'Frequency (Hz)', ylabel='dB')
+                ax.set(xlabel="Frequency (Hz)", ylabel="dB")
 
             plt.show()
 
-    
     def magnitude(self, re_list, im_list):
         mag_list = []
         for re, im in zip(re_list, im_list):
-            mag_list.append(10*np.log10(np.sqrt(re**2 + im**2)))
+            mag_list.append(10 * np.log10(np.sqrt(re**2 + im**2)))
         return mag_list
 
     def kill(self):
