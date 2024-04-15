@@ -140,30 +140,30 @@ class NanoVNASaverHeadless:
     def plot(self, animate):
         if animate:
             old_data = None
-            print(list(self.stream_data()))
-            new_data = list(self.stream_data())
-            print(new_data)
-            print('------------------')
-            x = new_data[3]
-            s11 = self.magnitude(new_data[0], new_data[1])
-            s21 = self.magnitude(new_data[2], new_data[3])
+            data = self.stream_data()
+            for new_data in data:
+                print(new_data)
+                print('------------------')
+                x = new_data[3]
+                s11 = self.magnitude(new_data[0], new_data[1])
+                s21 = self.magnitude(new_data[2], new_data[3])
 
-            plt.ion() 
-            fig, ax = plt.subplots(2, 1)
-            fig.tight_layout(pad=4.0)
-            line1, = ax[0].plot(x, s11, 'b-')
-            line2 = ax[1].plot(x, s21, 'b-')
-            plt.show()
+                plt.ion() 
+                fig, ax = plt.subplots(2, 1)
+                fig.tight_layout(pad=4.0)
+                line1, = ax[0].plot(x, s11, 'b-')
+                line2 = ax[1].plot(x, s21, 'b-')
+                plt.show()
 
-            while(self.worker.running):
-                if new_data != old_data:
-                    s11 = self.magnitude(new_data[0], new_data[1])
-                    s21 = self.magnitude(new_data[2], new_data[3])
-                    line1.set_ydata(s11)
-                    line2.set_ydata(s21)
-                    fig.canvas.draw() 
-                    fig.canvas.flush_events() 
-                    old_data = new_data
+                while(self.worker.running):
+                    if new_data != old_data:
+                        s11 = self.magnitude(new_data[0], new_data[1])
+                        s21 = self.magnitude(new_data[2], new_data[3])
+                        line1.set_ydata(s11)
+                        line2.set_ydata(s21)
+                        fig.canvas.draw() 
+                        fig.canvas.flush_events() 
+                        old_data = new_data
 
         else:
             data = self.single_sweep()
