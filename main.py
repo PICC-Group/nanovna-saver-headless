@@ -7,7 +7,7 @@ vna = NanoVNASaverHeadless(vna_index=0, verbose=False)
 vna.calibrate(None, CALIBRATION_FILE)
 vna.set_sweep(2.9e9, 3.1e9, 1, 101)
 
-vna.plot(True, "./testData/0grader3cm.csv")
+vna.plot(True, "./testData/0grader3cm.csv", True)
 
 # vna.save_csv("test")
 

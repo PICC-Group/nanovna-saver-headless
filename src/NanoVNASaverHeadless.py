@@ -31,8 +31,12 @@ class NanoVNASaverHeadless:
             self.vna = hw.get_VNA(self.iface)
             self.calibration = Calibration()
             self.touchstone = Touchstone(self.save_path)  # s2p for two port nanovnas.
-            self.worker = SweepWorker(self.vna, self.calibration, self.touchstone, verbose)
-            self.CalibrationGuide = CalibrationGuide(self.calibration, self.worker, verbose)
+            self.worker = SweepWorker(
+                self.vna, self.calibration, self.touchstone, verbose
+            )
+            self.CalibrationGuide = CalibrationGuide(
+                self.calibration, self.worker, verbose
+            )
             if self.verbose:
                 print("VNA is connected: ", self.vna.connected())
                 print("Firmware: ", self.vna.readFirmware())
@@ -90,7 +94,10 @@ class NanoVNASaverHeadless:
         return self._get_data()
 
     def stream_data(self, data_file=False):
-        """Creates a data stream from the continuous sweeping.
+        """Creates a data stream from the continuous sweeping. (Or a previously recorded file.)
+
+        Args:
+            data_file (string): Path to a previously recorded csv file to stream from. Defaults to False.
 
         Yields:
             list: Yields a list of data when new data is available.
@@ -121,6 +128,15 @@ class NanoVNASaverHeadless:
         self.worker_thread.start()
 
     def _csv_streamer(self, filename, data_points=5):
+        """Stream previously recorded data from a csv file.
+
+        Args:
+            filename (string): Path to the csv file.
+            data_points (int): Number of lines that each sweep is stored as. Defaults to 5.
+
+        Yields:
+            list: [refl_re, refl_im, thru_re, thru_im, freq]
+        """
         try:
             with open(filename) as f:
                 data = f.readlines()
@@ -128,16 +144,18 @@ class NanoVNASaverHeadless:
                 counter = 0
                 for i, line in enumerate(data):
                     if i != 0:
-                        package.append([float(x) for x in line.replace("\n", "").split(", ")])
+                        package.append(
+                            [float(x) for x in line.replace("\n", "").split(", ")]
+                        )
                         counter += 1
-                        if counter == 5:
-                            counter = 0
+                        if counter == data_points:
                             yield package
+                            counter = 0
                             package = []
         except Exception as e:
             print(e)
 
-    def _access_data(self, file=False):
+    def _access_data(self):
         """Fetches the data from the sweep worker as long as it is running a sweep.
 
         Yields:
@@ -177,7 +195,14 @@ class NanoVNASaverHeadless:
             thru_im.append(datapoint.im)
         return refl_re, refl_im, thru_re, thru_im, freq
 
-    def plot(self, animate, data_file=False):
+    def plot(self, animate, data_file=False, loop=False):
+        """Show a magnitude plot from the data. If animate is True it will update the plot continuously with data from live stream or previously recorded file.
+
+        Args:
+            animate (bool): If the stream should be from a single sweep or continuous stream.
+            data_file (bool, str): Pass a filepath to show previously recorded stream. Defaults to False.
+            loop (bool): Loop the stream from the datafile. Defaults to False.
+        """
         if animate:
             plt.ion()
             fig, ax = plt.subplots(2, 1)
@@ -195,25 +220,34 @@ class NanoVNASaverHeadless:
             ax[0].legend()
             ax[1].legend()
             plt.show()
+            run = True
+            while run:
+                data = self.stream_data(data_file)
+                for new_data in data:
+                    s11 = self.magnitude(new_data[0], new_data[1])
+                    s21 = self.magnitude(new_data[2], new_data[3])
+                    x = new_data[4]
+                    line1.set_data(x, s11)
+                    line2.set_data(x, s21)
 
-            data = self.stream_data(data_file)
-            for new_data in data:
-                s11 = self.magnitude(new_data[0], new_data[1])
-                s21 = self.magnitude(new_data[2], new_data[3])
-                x = new_data[4]
-                line1.set_data(x, s11)
-                line2.set_data(x, s21)
+                    # Update limits and redraw the plot
+                    for ax_item in ax.flat:
+                        ax_item.relim()  # Recalculate limits
+                        ax_item.autoscale_view()  # Autoscale
 
-                # Update limits and redraw the plot
-                for ax_item in ax.flat:
-                    ax_item.relim()  # Recalculate limits
-                    ax_item.autoscale_view()  # Autoscale
-
-                fig.canvas.draw()
-                fig.canvas.flush_events()
-                plt.pause(0.01)
+                    fig.canvas.draw()
+                    fig.canvas.flush_events()
+                    plt.pause(0.01)
+                run = data_file and loop
+                if self.verbose:
+                    print("Looped the animation.")
 
         else:
+            if self.playback_mode:
+                print(
+                    "Cannot run sweeps in playback mode. Connect NanoVNA and restart."
+                )
+                return
             data = self.single_sweep()
             magnitudeS11 = self.magnitude(data[0], data[1])
             magnitudeS21 = self.magnitude(data[2], data[3])
@@ -238,12 +272,31 @@ class NanoVNASaverHeadless:
             plt.show()
 
     def magnitude(self, re_list, im_list):
+        """Function to get the magnitude and prepare for plotting.
+
+        Args:
+            re_list (list): List with real parts.
+            im_list (list): List with imaginary parts.
+
+        Returns:
+            list: List with the magnitude.
+        """
         mag_list = []
         for re, im in zip(re_list, im_list):
             mag_list.append(10 * np.log10(np.sqrt(re**2 + im**2)))
         return mag_list
 
-    def save_csv(self, filename, nr_sweeps= 10, skip_start=5):
+    def save_csv(self, filename, nr_sweeps=10, skip_start=5):
+        """Function to save the stream to a csv file.
+
+        Args:
+            filename (str): The filename to save to.
+            nr_sweeps (int): Number of sweeps to run. Defaults to 10.
+            skip_start (int): The NanoVNA usually gives bad data in the beginning, therefore this data can be skipped. Defaults to 5.
+
+        Raises:
+            TypeError: If the filename is not a string.
+        """
         if self.playback_mode:
             print("Cannot run sweeps in playback mode. Connect NanoVNA and restart.")
             return
@@ -266,7 +319,10 @@ class NanoVNASaverHeadless:
                 for new_data in data_stream:
                     if new_data != old_data:
                         for data in new_data:
-                            if counter > skip_start and counter < skip_start + nr_sweeps:
+                            if (
+                                counter > skip_start
+                                and counter < skip_start + nr_sweeps
+                            ):
                                 writer.writerow(data)
                         old_data = new_data
                         counter += 1

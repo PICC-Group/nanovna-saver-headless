@@ -60,10 +60,7 @@ class CalibrationGuide:  # renamed from CalibrationWindow since it is no longer 
             # There's raw data, so we can get corrected data
             if self.verbose:
                 print("Applying new offset to existing sweep data.")
-            (
-                self.worker.data11,
-                self.worker.data21,
-            ) = self.worker.applyCalibration(
+            (self.worker.data11, self.worker.data21,) = self.worker.applyCalibration(
                 self.worker.rawData11, self.worker.rawData21
             )
             if self.verbose:
