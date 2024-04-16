@@ -39,3 +39,4 @@ tags
 # NanoVNASaverHeadless specific
 *.s1p
 *.s2p
+*.csv

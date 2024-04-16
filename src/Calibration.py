@@ -324,14 +324,15 @@ class Calibration:
         cal.e22 = gm7 / (gm7 * cal.e11 * gt**2 + cal.e10e01 * gt**2)
         cal.e10e32 = (gm4 - gm6) * (1 - cal.e11 * cal.e22 * gt**2) / gt
 
-    def calc_corrections(self):
+    def calc_corrections(self, verbose=False):
         if not self.isValid1Port():
             print("Tried to calibrate from insufficient data.")
             raise ValueError(
                 "All of short, open and load calibration steps"
                 "must be completed for calibration to be applied."
             )
-        print("Calculating calibration for %d points.", self.size())
+        if verbose:
+            print("Calculating calibration for %d points.", self.size())
 
         for freq, caldata in self.dataset.items():
             try:
@@ -351,7 +352,8 @@ class Calibration:
 
         self.gen_interpolation()
         self.isCalculated = True
-        print("Calibration correctly calculated.")
+        if verbose:
+            print("Calibration correctly calculated.")
 
     def gamma_short(self, freq: int) -> complex:
         if self.cal_element.short_is_ideal:
@@ -377,10 +379,11 @@ class Calibration:
             * cmath.exp(complex(0.0, -4.0 * math.pi * freq * cal_element.short_length))
         )
 
-    def gamma_open(self, freq: int) -> complex:
+    def gamma_open(self, freq: int, verbose=False) -> complex:
         if self.cal_element.open_is_ideal:
             return IDEAL_OPEN
-        print("Using open calibration set values.")
+        if verbose:
+            print("Using open calibration set values.")
         cal_element = self.cal_element
         Zop = complex(
             0.0,
@@ -398,10 +401,11 @@ class Calibration:
             complex(0.0, -4.0 * math.pi * freq * cal_element.open_length)
         )
 
-    def gamma_load(self, freq: int) -> complex:
+    def gamma_load(self, freq: int, verbose=False) -> complex:
         if self.cal_element.load_is_ideal:
             return IDEAL_LOAD
-        print("Using load calibration set values.")
+        if verbose:
+            print("Using load calibration set values.")
         cal_element = self.cal_element
         Zl = complex(cal_element.load_r, 0.0)
         if cal_element.load_c > 0.0:
@@ -417,10 +421,11 @@ class Calibration:
             * cmath.exp(complex(0.0, -4 * math.pi * freq * cal_element.load_length))
         )
 
-    def gamma_through(self, freq: int) -> complex:
+    def gamma_through(self, freq: int, verbose=False) -> complex:
         if self.cal_element.through_is_ideal:
             return IDEAL_THROUGH
-        print("Using through calibration set values.")
+        if verbose:
+            print("Using through calibration set values.")
         cal_element = self.cal_element
         return cmath.exp(
             complex(0.0, -2.0 * math.pi * cal_element.through_length * freq)
