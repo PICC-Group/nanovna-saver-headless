@@ -120,14 +120,20 @@ class NanoVNASaverHeadless:
         self.worker_thread = threading.Thread(target=self.worker.run)
         self.worker_thread.start()
 
-    def _csv_streamer(self, filename):
+    def _csv_streamer(self, filename, data_points=5):
         try:
-            print("reading file")
             with open(filename) as f:
                 data = f.readlines()
+                package = []
+                counter = 0
                 for i, line in enumerate(data):
                     if i != 0:
-                        yield line
+                        package.append([float(x) for x in line.replace("\n", "").split(", ")])
+                        counter += 1
+                        if counter == 5:
+                            counter = 0
+                            yield package
+                            package = []
         except Exception as e:
             print(e)
 
@@ -205,7 +211,7 @@ class NanoVNASaverHeadless:
 
                 fig.canvas.draw()
                 fig.canvas.flush_events()
-                # plt.pause(0.01)
+                plt.pause(0.01)
 
         else:
             data = self.single_sweep()
