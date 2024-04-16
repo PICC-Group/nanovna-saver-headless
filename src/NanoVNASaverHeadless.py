@@ -142,10 +142,10 @@ class NanoVNASaverHeadless:
     def plot(self, animate):
         if animate:
             old_data = None
-            print(list(self.stream_data()))
+            for data in list(self.stream_data()):
+                print(data)
+                print('-----------')
             new_data = list(self.stream_data())
-            print(new_data)
-            print('------------------')
             x = new_data[3]
             s11 = self.magnitude(new_data[0], new_data[1])
             s21 = self.magnitude(new_data[2], new_data[3])
