@@ -21,16 +21,22 @@ class NanoVNASaverHeadless:
         """
         self.verbose = verbose
         self.save_path = save_path
-        self.iface = hw.get_interfaces()[vna_index]
-        self.vna = hw.get_VNA(self.iface)
-        self.calibration = Calibration()
-        self.touchstone = Touchstone(self.save_path)  # s2p for two port nanovnas.
-        self.worker = SweepWorker(self.vna, self.calibration, self.touchstone, verbose)
-        self.CalibrationGuide = CalibrationGuide(self.calibration, self.worker, verbose)
-        if self.verbose:
-            print("VNA is connected: ", self.vna.connected())
-            print("Firmware: ", self.vna.readFirmware())
-            print("Features: ", self.vna.read_features())
+        self.playback_mode = False
+        try:
+            self.iface = hw.get_interfaces()[vna_index]
+        except IndexError:
+            print("NanoVNA not found, is it connected? Entering playback mode.")
+            self.playback_mode = True
+        if not self.playback_mode:
+            self.vna = hw.get_VNA(self.iface)
+            self.calibration = Calibration()
+            self.touchstone = Touchstone(self.save_path)  # s2p for two port nanovnas.
+            self.worker = SweepWorker(self.vna, self.calibration, self.touchstone, verbose)
+            self.CalibrationGuide = CalibrationGuide(self.calibration, self.worker, verbose)
+            if self.verbose:
+                print("VNA is connected: ", self.vna.connected())
+                print("Firmware: ", self.vna.readFirmware())
+                print("Features: ", self.vna.read_features())
 
     def calibrate(self, savefile=None, load_file=False):
         """Run the calibration guide and calibrate the NanoVNA.
@@ -39,6 +45,9 @@ class NanoVNASaverHeadless:
             savefile (path): Path to save the calibration. Defaults to None.
             load_file (bool, optional): Path to existing calibration. Defaults to False.
         """
+        if self.playback_mode:
+            print("Cannot calibrate in playback mode. Connect NanoVNA and restart.")
+            return
         if load_file:
             self.CalibrationGuide.loadCalibration(load_file)
             return
@@ -58,6 +67,9 @@ class NanoVNASaverHeadless:
             segments (int): Number of segments.
             points (int): Number of points.
         """
+        if self.playback_mode:
+            print("Cannot set sweep in playback mode. Connect NanoVNA and restart.")
+            return
         self.worker.sweep.update(start, stop, segments, points)
         if self.verbose:
             print(
@@ -70,19 +82,28 @@ class NanoVNASaverHeadless:
             )
 
     def single_sweep(self):
+        if self.playback_mode:
+            print("Cannot do a sweep in playback mode. Connect NanoVNA and restart.")
+            return
         self.worker.sweep.set_mode("SINGLE")
         self.worker.run()
         return self._get_data()
 
-    def stream_data(self):
+    def stream_data(self, data_file=False):
         """Creates a data stream from the continuous sweeping.
 
         Yields:
             list: Yields a list of data when new data is available.
         """
-        self._stream_data()
+        if not data_file:
+            self._stream_data()
         try:
-            for data in self._access_data():
+            if not data_file:
+                stream = self._access_data()
+            else:
+                stream = self._csv_streamer(data_file)
+
+            for data in stream:
                 yield data  # Yield each piece of data as it comes
         except Exception as e:
             if self.verbose:
@@ -99,7 +120,18 @@ class NanoVNASaverHeadless:
         self.worker_thread = threading.Thread(target=self.worker.run)
         self.worker_thread.start()
 
-    def _access_data(self):
+    def _csv_streamer(self, filename):
+        try:
+            print("reading file")
+            with open(filename) as f:
+                data = f.readlines()
+                for i, line in enumerate(data):
+                    if i != 0:
+                        yield line
+        except Exception as e:
+            print(e)
+
+    def _access_data(self, file=False):
         """Fetches the data from the sweep worker as long as it is running a sweep.
 
         Yields:
@@ -113,8 +145,9 @@ class NanoVNASaverHeadless:
         """Stop the sweep worker and kill the stream."""
         if self.verbose:
             print("NanoVNASaverHeadless is stopping sweepworker now.")
-        self.worker.running = False
-        self.worker_thread.join()
+        if not self.playback_mode:
+            self.worker.running = False
+            self.worker_thread.join()
 
     def _get_data(self):
         """Get data from the sweep worker.
@@ -138,7 +171,7 @@ class NanoVNASaverHeadless:
             thru_im.append(datapoint.im)
         return refl_re, refl_im, thru_re, thru_im, freq
 
-    def plot(self, animate):
+    def plot(self, animate, data_file=False):
         if animate:
             plt.ion()
             fig, ax = plt.subplots(2, 1)
@@ -157,7 +190,7 @@ class NanoVNASaverHeadless:
             ax[1].legend()
             plt.show()
 
-            data = self.stream_data()
+            data = self.stream_data(data_file)
             for new_data in data:
                 s11 = self.magnitude(new_data[0], new_data[1])
                 s21 = self.magnitude(new_data[2], new_data[3])
@@ -204,7 +237,10 @@ class NanoVNASaverHeadless:
             mag_list.append(10 * np.log10(np.sqrt(re**2 + im**2)))
         return mag_list
 
-    def save_csv(self, filename):
+    def save_csv(self, filename, nr_sweeps= 10, skip_start=5):
+        if self.playback_mode:
+            print("Cannot run sweeps in playback mode. Connect NanoVNA and restart.")
+            return
         try:
             if not isinstance(filename, str):
                 raise TypeError("Filename must be a string")
@@ -215,21 +251,21 @@ class NanoVNASaverHeadless:
             old_data = None
             # Counter because NanoVNA sends out incorrect data the first few times
             counter = 0
-            print("Starting to save...")
+            if self.verbose:
+                print("Starting to save...")
             with open(file_path, mode="w", newline="") as file:
                 writer = csv.writer(file)
-                writer.writerow(["ReflRe", " ReflIm", " ThruRe", " ThruIm", " Freq"])
+                writer.writerow("ReflRe", " ReflIm", " ThruRe", " ThruIm", " Freq")
                 data_stream = self.stream_data()
                 for new_data in data_stream:
                     if new_data != old_data:
                         for data in new_data:
-                            # Saves 10 sweeps
-                            if counter > 5 and counter < 16:
-                                writer.writerow([data])
+                            if counter > skip_start and counter < skip_start + nr_sweeps:
+                                writer.writerow(data)
                         old_data = new_data
-                        if counter == 16:
-                            print("Done!")
                         counter += 1
+                if self.verbose:
+                    print("Done!")
         except Exception as e:
             print("An error occurred:", e)
 
@@ -239,6 +275,9 @@ class NanoVNASaverHeadless:
         Raises:
             Exception: If the NanoVNA was not successfully disconnected.
         """
+        if self.playback_mode:
+            print("Cannot kill in playback mode. Connect NanoVNA and restart.")
+            return
         self._stop_worker()
         self.vna.disconnect()
         if self.vna.connected():
