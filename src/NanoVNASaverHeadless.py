@@ -106,6 +106,9 @@ class NanoVNASaverHeadless:
             self._stream_data()
         try:
             if not data_file:
+                if self.playback_mode:
+                    print("Cannot stream data from NanoVNA in playback mode. Connect NanoVNA and restart.")
+                    return
                 stream = self._access_data()
             else:
                 stream = self._csv_streamer(data_file)
