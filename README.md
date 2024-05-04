@@ -1,3 +1,4 @@
+# THIS PROJECT IS NO LONGER ACTIVE, PLEASE USE [pynanovna](https://github.com/PICC-Group/pynanovna) INSTEAD!
 # Code for using NanoVNASaver without the GUI.
 This project is a fork of the original [NanoVNASaver](https://github.com/NanoVNA-Saver/nanovna-saver) project, but without all the GUI parts. It is developed by The PICC Group at Lund University in the IEEE AP-S Student Design Contest.
 
